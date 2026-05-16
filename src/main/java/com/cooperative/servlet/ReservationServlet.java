@@ -257,6 +257,8 @@ public class ReservationServlet extends HttpServlet {
         if (fieldError != null && !fieldError.isBlank()) {
             if ("idreserv".equals(fieldName)) {
                 req.setAttribute("idReservError", fieldError);
+            } else if ("montant_avance".equals(fieldName)) {
+                req.setAttribute("montantAvanceError", fieldError);
             } else {
                 req.setAttribute("errorMessage", fieldError);
             }
@@ -394,7 +396,8 @@ public class ReservationServlet extends HttpServlet {
         throw new IllegalArgumentException("Paiement invalide.");
     }
 
-    private void applyMontantAvanceForPaiement(Reservation reservation, String rawMontant) throws SQLException {
+    private void applyMontantAvanceForPaiement(Reservation reservation, String rawMontant)
+            throws SQLException, FieldValidationException {
         Voiture v = voitureDAO.findById(reservation.getIdVoit());
         if (v == null) {
             throw new IllegalArgumentException("Voiture introuvable.");
@@ -406,14 +409,23 @@ public class ReservationServlet extends HttpServlet {
         } else if ("Tout payé".equals(paiement)) {
             reservation.setMontantAvance(frais);
         } else {
-            // "Avec avance" : lire depuis le hidden ou le champ visible
+            // "Avec avance"
             String raw = rawMontant;
             if (raw == null || raw.trim().isBlank()) {
                 raw = "0";
             }
             int avance = parseNonNegativeInt(raw, "Montant avance invalide.");
             if (avance <= 0) {
-                throw new IllegalArgumentException("Avec 'Avec avance', le montant avance doit etre superieur a 0.");
+                throw new FieldValidationException(
+                    "Avec 'Avec avance', le montant avance doit etre superieur a 0.",
+                    "montant_avance"
+                );
+            }
+            if (avance > frais) {
+                throw new FieldValidationException(
+                    "Le montant avance ne peut pas depasser le montant total (" + frais + " Ar).",
+                    "montant_avance"
+                );
             }
             reservation.setMontantAvance(avance);
         }

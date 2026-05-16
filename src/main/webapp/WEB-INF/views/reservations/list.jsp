@@ -296,6 +296,9 @@
                        value="${rf.montantAvance}"
                        autocomplete="off" />
                 <div class="text-danger small mt-1 d-none" id="resMontantAvanceFeedback">Montant avance invalide pour ce mode de paiement.</div>
+                <c:if test="${not empty montantAvanceError}">
+                    <div class="text-danger small mt-1">${montantAvanceError}</div>
+                </c:if>
             </div>
         </div>
         <div class="offcanvas-footer p-3 d-flex justify-content-end gap-2">

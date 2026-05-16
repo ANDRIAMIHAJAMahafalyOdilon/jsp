@@ -348,12 +348,6 @@ public class ReservationDAO {
         int avance = reservation.getMontantAvance();
         String paiement = reservation.getPaiement();
 
-        if (avance < 0) {
-            throw new SQLException("Le montant avance ne peut pas etre negatif.");
-        }
-        if (avance > frais) {
-            throw new SQLException("Le montant avance (" + avance + ") ne peut pas depasser le frais (" + frais + ").");
-        }
         if ("Sans avance".equals(paiement) && avance != 0) {
             throw new SQLException("Avec 'Sans avance', le montant avance doit etre 0.");
         }
