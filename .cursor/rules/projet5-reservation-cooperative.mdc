@@ -1,0 +1,39 @@
+---
+description: Standards du projet JSP de reservation cooperative (Bootstrap 5, CRUD, recherches, PDF, statistiques)
+alwaysApply: true
+---
+
+# Projet 5 - Reservation des places (JSP)
+
+## Stack et structure
+- Utiliser JSP/Servlet (Java web) et Bootstrap 5 pour toute l'interface.
+- Garder une architecture claire: `model` (entites), `dao` (acces DB), `servlet` (controleurs), `webapp` (JSP).
+- Eviter la logique metier lourde dans les JSP; la mettre dans Servlet/Service.
+
+## Schema metier obligatoire
+- Tables: `VOITURE(idvoit, design, type, nbrplace, frais)`, `PLACE(idvoit, place, occupation)`, `CLIENT(idcli, nom, numtel)`, `RESERVER(idreserv, idvoit, idcli, place, date_reserv, date_voyage, paiement, montant_avance)`.
+- `type` voiture: `Simple | Premium | VIP`.
+- `occupation` place: `Oui | Non`.
+- `paiement`: `Sans avance | Avec avance | Tout paye`.
+- Format `date_reserv`: `yyyy-MM-dd HH:mm:ss`.
+
+## Fonctionnalites minimales a livrer
+- CRUD complet pour `VOITURE` et `CLIENT`.
+- Creation, affichage, mise a jour pour `RESERVER`.
+- Recherche client par `nom` ou `numtel` avec `LIKE`.
+- Generation PDF d'un recu de reservation client.
+- Affichage des places libres d'une voiture.
+- Liste voyageurs par statut de paiement (avance avec reste, non paye, tout paye) + nombre total.
+- Recette totale accumulee par la cooperative.
+
+## Regles de calcul
+- `reste_a_payer = frais - montant_avance` (jamais negatif).
+- `Sans avance` => `montant_avance = 0`.
+- `Tout paye` => `montant_avance = frais`.
+- `Avec avance` => `0 < montant_avance < frais`.
+
+## Bonnes pratiques JSP/SQL
+- Utiliser `PreparedStatement` pour toutes les requetes SQL.
+- Valider les champs serveur (types, bornes, valeurs enum, dates) avant persistance.
+- Afficher les messages d'erreur/succes via alertes Bootstrap 5.
+- Conserver le texte du recu proche de cet exemple: numero, dates, client, contact, voiture, type, place, frais, paiement, avance, reste.
