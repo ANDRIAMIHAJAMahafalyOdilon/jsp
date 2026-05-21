@@ -9,7 +9,7 @@ public class ReservationView {
     private String idReserv;
     private String idVoit;
     private String typeVoiture;
-    private int idCli;
+    private String idCli;
     private String nomClient;
     private String numTel;
     private int place;
@@ -26,8 +26,8 @@ public class ReservationView {
     public void setIdVoit(String idVoit) { this.idVoit = idVoit; }
     public String getTypeVoiture() { return typeVoiture; }
     public void setTypeVoiture(String typeVoiture) { this.typeVoiture = typeVoiture; }
-    public int getIdCli() { return idCli; }
-    public void setIdCli(int idCli) { this.idCli = idCli; }
+    public String getIdCli() { return idCli; }
+    public void setIdCli(String idCli) { this.idCli = idCli; }
     public String getNomClient() { return nomClient; }
     public void setNomClient(String nomClient) { this.nomClient = nomClient; }
     public String getNumTel() { return numTel; }

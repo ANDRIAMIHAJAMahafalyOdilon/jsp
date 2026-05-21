@@ -2,6 +2,7 @@ package com.cooperative.servlet;
 
 import com.cooperative.dao.ReservationDAO;
 import com.cooperative.dao.VoitureDAO;
+import com.cooperative.model.PaiementReport;
 import com.cooperative.model.ReservationView;
 import com.cooperative.model.Voiture;
 
@@ -23,7 +24,24 @@ public class DashboardServlet extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         try {
-            req.setAttribute("paiementStats", reservationDAO.getPaiementStats());
+            List<PaiementReport> stats = reservationDAO.getPaiementStats();
+            req.setAttribute("paiementStats", stats);
+            int countAvance = 0;
+            int countNon = 0;
+            int countTout = 0;
+            for (PaiementReport ps : stats) {
+                String cat = ps.getCategorie();
+                if ("avance".equals(cat)) {
+                    countAvance = ps.getTotal();
+                } else if ("non".equals(cat)) {
+                    countNon = ps.getTotal();
+                } else if ("tout".equals(cat)) {
+                    countTout = ps.getTotal();
+                }
+            }
+            req.setAttribute("countAvance", countAvance);
+            req.setAttribute("countNon", countNon);
+            req.setAttribute("countTout", countTout);
             req.setAttribute("totalRecette", reservationDAO.getTotalRecette());
             req.setAttribute("totalVoyageurs", reservationDAO.getTotalVoyageurs());
             req.setAttribute("resteAPayer", reservationDAO.getResteAPayerTotal());
@@ -34,11 +52,11 @@ public class DashboardServlet extends HttpServlet {
             List<ReservationView> travellers = reservationDAO.findByPaiementCategory(payCat);
             String payCatLabel = "";
             if ("avance".equalsIgnoreCase(payCat)) {
-                payCatLabel = "Avance avec reste a payer";
+                payCatLabel = "Avance + reste à payer";
             } else if ("non".equalsIgnoreCase(payCat)) {
-                payCatLabel = "Pas encore paye";
+                payCatLabel = "Pas encore payé";
             } else if ("tout".equalsIgnoreCase(payCat)) {
-                payCatLabel = "Tout paye";
+                payCatLabel = "Tout payé";
             }
             req.setAttribute("payCat", payCat);
             req.setAttribute("payCatLabel", payCatLabel);

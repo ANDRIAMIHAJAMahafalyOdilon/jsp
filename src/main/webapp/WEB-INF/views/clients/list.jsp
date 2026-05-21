@@ -129,10 +129,10 @@
                            name="idcli"
                            value="${cf.idCli}"
                            required
-                           inputmode="numeric"
-                           data-numeric-only="true"
-                           oninput="this.value=this.value.replace(/\\D/g,'')"
-                           placeholder="Ex: 12"
+                           maxlength="30"
+                           pattern="[A-Za-z0-9_\\-]{1,30}"
+                           title="ID client : lettres, chiffres, tiret ou underscore (1 a 30 caracteres)"
+                           placeholder="Ex: CLI-001"
                            autocomplete="off"
                            data-manual-invalid="true" />
                     <div id="clientIdFeedback" class="invalid-feedback d-block" style="${empty idCliError ? 'display:none' : 'display:block'}">${idCliError}</div>

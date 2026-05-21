@@ -1,8 +1,21 @@
 package com.cooperative.servlet;
 
+import com.cooperative.dao.ClientDAO;
+import com.cooperative.dao.ReservationDAO;
+import com.cooperative.dao.VoitureDAO;
+import com.cooperative.model.Reservation;
+import com.cooperative.model.ReservationView;
+import com.cooperative.model.Voiture;
+
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
 import java.io.IOException;
-import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -11,20 +24,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-
-import javax.servlet.ServletException;
-import javax.servlet.annotation.WebServlet;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
-
-import com.cooperative.dao.ClientDAO;
-import com.cooperative.dao.ReservationDAO;
-import com.cooperative.dao.VoitureDAO;
-import com.cooperative.model.Reservation;
-import com.cooperative.model.ReservationView;
-import com.cooperative.model.Voiture;
 
 @WebServlet("/reservations")
 public class ReservationServlet extends HttpServlet {
@@ -142,9 +141,13 @@ public class ReservationServlet extends HttpServlet {
             }
 
             reservation.setIdVoit(requireNonBlank(req.getParameter("idvoit"), "Voiture obligatoire."));
-            reservation.setIdCli(parsePositiveInt(req.getParameter("idcli"), "Client invalide."));
-            // place sera défini plus bas depuis la liste des places sélectionnées
-            reservation.setPlace(0);
+            reservation.setIdCli(requireNonBlank(req.getParameter("idcli"), "Client obligatoire."));
+            String rawPlace = req.getParameter("place");
+            if (rawPlace != null && !rawPlace.trim().isBlank()) {
+                reservation.setPlace(parsePositiveInt(rawPlace, "Place invalide."));
+            } else {
+                reservation.setPlace(1);
+            }
             String rawDateReserv = req.getParameter("date_reserv");
             if ("update".equals(action)) {
                 if (rawDateReserv == null || rawDateReserv.trim().isEmpty()) {
@@ -221,19 +224,28 @@ public class ReservationServlet extends HttpServlet {
                 resp.sendRedirect(req.getContextPath() + "/reservations?action=edit&id=" + encode(reservation.getIdReserv()));
                 return;
             }
-            prepareFormError(req, action, reservation, placesRaw, message, null);
-            if (message != null && message.contains("date voyage")) {
+            String field = null;
+            if (message != null && (message.contains("montant") || message.contains("avance") || message.contains("paye"))) {
+                field = "montant_avance";
+            }
+            prepareFormError(req, action, reservation, placesRaw, message, field);
+            if (field == null && message != null && message.contains("date voyage")) {
                 req.setAttribute("dateVoyageError", message);
-            } else if (message != null && (message.contains("Date reservation") || message.contains("Format Reservation"))) {
+            } else if (field == null && message != null && (message.contains("Date reservation") || message.contains("Format Reservation"))) {
                 req.setAttribute("dateReservError", message);
             }
             doGet(req, resp);
         } catch (SQLException e) {
+            String msg = safe(e.getMessage());
+            String field = null;
+            if (msg.contains("montant") || msg.contains("avance") || msg.contains("paye") || msg.contains("payé")) {
+                field = "montant_avance";
+            }
             if ("update".equals(action)) {
-                setFlash(req, "danger", "Erreur base de donnees: " + safe(e.getMessage()));
+                setFlash(req, "danger", "Erreur base de donnees: " + msg);
                 resp.sendRedirect(req.getContextPath() + "/reservations");
             } else {
-                forwardWithFormError(req, resp, action, reservation, placesRaw, "Erreur: " + safe(e.getMessage()), null);
+                forwardWithFormError(req, resp, action, reservation, placesRaw, msg, field);
             }
         }
     }
@@ -386,18 +398,17 @@ public class ReservationServlet extends HttpServlet {
                 .replace("ê", "e")
                 .replace("à", "a");
 
-        if ("sans avance".equals(compact)) return "Sans avance";
-        if ("avec avance".equals(compact)) return "Avec avance";
-        if ("tout paye".equals(compact) || "tout payé".equalsIgnoreCase(value.trim())) return "Tout payé";
-
-        // Handle common mojibake cases from wrong request encoding.
-        if (compact.contains("payã©") || compact.contains("paye")) return "Tout payé";
+        if ("sans avance".equals(compact) || compact.startsWith("sans")) return "Sans avance";
+        if ("avec avance".equals(compact) || compact.startsWith("avec")) return "Avec avance";
+        if ("tout paye".equals(compact) || compact.contains("tout pay")
+                || compact.contains("payã©") || (compact.contains("tout") && compact.contains("pay"))) {
+            return "Tout payé";
+        }
 
         throw new IllegalArgumentException("Paiement invalide.");
     }
 
-    private void applyMontantAvanceForPaiement(Reservation reservation, String rawMontant)
-            throws SQLException, FieldValidationException {
+    private void applyMontantAvanceForPaiement(Reservation reservation, String rawMontant) throws SQLException {
         Voiture v = voitureDAO.findById(reservation.getIdVoit());
         if (v == null) {
             throw new IllegalArgumentException("Voiture introuvable.");
@@ -409,23 +420,13 @@ public class ReservationServlet extends HttpServlet {
         } else if ("Tout payé".equals(paiement)) {
             reservation.setMontantAvance(frais);
         } else {
-            // "Avec avance"
-            String raw = rawMontant;
-            if (raw == null || raw.trim().isBlank()) {
-                raw = "0";
+            if (frais <= 1) {
+                throw new IllegalArgumentException("Pour cette voiture, choisissez 'Tout paye'.");
             }
-            int avance = parseNonNegativeInt(raw, "Montant avance invalide.");
-            if (avance <= 0) {
-                throw new FieldValidationException(
-                    "Avec 'Avec avance', le montant avance doit etre superieur a 0.",
-                    "montant_avance"
-                );
-            }
-            if (avance > frais) {
-                throw new FieldValidationException(
-                    "Le montant avance ne peut pas depasser le montant total (" + frais + " Ar).",
-                    "montant_avance"
-                );
+            int avance = parseNonNegativeInt(rawMontant, "Montant avance invalide.");
+            if (avance <= 0 || avance >= frais) {
+                throw new IllegalArgumentException(
+                        "Avec 'Avec avance', le montant doit etre entre 1 et " + (frais - 1) + " Ar.");
             }
             reservation.setMontantAvance(avance);
         }

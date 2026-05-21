@@ -1,4 +1,4 @@
-﻿<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/fmt" prefix="fmt" %>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/functions" prefix="fn" %>
@@ -40,7 +40,15 @@
     }
 
     /* Same style as dashboard "Dernieres reservations" */
-    .status-badge { font-size: .78rem; padding: 5px 12px; border-radius: 20px; font-weight: 600; }
+    .status-badge {
+        font-size: .78rem;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        white-space: nowrap;
+        display: inline-block;
+    }
+    .paiement-cell { white-space: nowrap; }
 
     .live-search-wrap { position: relative; min-width: 260px; }
     .live-search-clear {
@@ -151,9 +159,9 @@
                         <td><span class="badge text-bg-dark">Place ${r.place}</span></td>
                         <td>${r.dateReserv}</td>
                         <td>${r.dateVoyage}</td>
-                        <td>
+                        <td class="paiement-cell">
                             <c:choose>
-                                <c:when test="${r.paiement == 'Tout payé'}">
+                                <c:when test="${r.paiement == 'Tout payé' or fn:startsWith(r.paiement, 'Tout pay')}">
                                     <span class="status-badge bg-success-subtle text-success">Tout payé</span>
                                 </c:when>
                                 <c:when test="${r.paiement == 'Avec avance'}">
@@ -257,7 +265,7 @@
                     <i class="bi bi-grid-3x3-gap me-1"></i> Choisir les places
                 </button>
                 <input class="form-control mt-2" type="text" id="resPlaceDisplay" readonly placeholder="Aucune place selectionnee" />
-                <div class="invalid-feedback" id="resPlaceFeedback" style="display:none;">Veuillez selectionner au moins une place.</div>
+                <div class="invalid-feedback d-block d-none" id="resPlaceFeedback">Veuillez selectionner au moins une place.</div>
             </div>
             <div class="mb-2">
                 <label class="form-label">Date reservation</label>
@@ -295,10 +303,7 @@
                        min="0"
                        value="${rf.montantAvance}"
                        autocomplete="off" />
-                <div class="text-danger small mt-1 d-none" id="resMontantAvanceFeedback">Montant avance invalide pour ce mode de paiement.</div>
-                <c:if test="${not empty montantAvanceError}">
-                    <div class="text-danger small mt-1">${montantAvanceError}</div>
-                </c:if>
+                <div class="text-danger small mt-1 ${not empty montantAvanceError ? '' : 'd-none'}" id="resMontantAvanceFeedback">${not empty montantAvanceError ? montantAvanceError : 'Montant avance invalide pour ce mode de paiement.'}</div>
             </div>
         </div>
         <div class="offcanvas-footer p-3 d-flex justify-content-end gap-2">
@@ -662,9 +667,9 @@
         var lastEditableValue = montantInput.value || "";
 
         function normalizeMode(raw) {
-            var s = (raw || "").toLowerCase().replace(/é|è|ê/g, "e").trim();
-            if (s.indexOf("sans") !== -1) return "sans";
-            if (s.indexOf("tout") !== -1) return "tout";
+            var v = (raw || "").trim();
+            if (v === "Sans avance") return "sans";
+            if (v === "Tout payé" || v === "Tout paye") return "tout";
             return "avec";
         }
 
@@ -674,7 +679,15 @@
         }
 
         function syncHidden() {
-            montantHidden.value = montantInput.value === "" ? "0" : String(montantInput.value);
+            var mode = normalizeMode(paiementSelect.value);
+            var frais = getFrais();
+            if (mode === "sans") {
+                montantHidden.value = "0";
+            } else if (mode === "tout") {
+                montantHidden.value = String(frais);
+            } else {
+                montantHidden.value = montantInput.value === "" ? "0" : String(montantInput.value);
+            }
         }
 
         function setFrozen(frozen) {
@@ -707,7 +720,11 @@
                     ? ("Montant total : " + frais.toLocaleString("fr-FR") + " Ar")
                     : "Montant total : —";
                 montantInput.setAttribute("min", "1");
-                montantInput.removeAttribute("max");
+                if (frais > 1) {
+                    montantInput.setAttribute("max", String(frais - 1));
+                } else {
+                    montantInput.removeAttribute("max");
+                }
                 if (!preserveAvance) {
                     montantInput.value = lastEditableValue && lastEditableValue !== "0"
                         ? lastEditableValue
@@ -717,20 +734,47 @@
             syncHidden();
         }
 
+        function showMontantError(msg) {
+            montantInput.classList.add("is-invalid");
+            if (montantFeedback) {
+                montantFeedback.textContent = msg;
+                montantFeedback.classList.remove("d-none");
+            }
+        }
+
+        function clearMontantError() {
+            montantInput.classList.remove("is-invalid");
+            if (montantFeedback) {
+                montantFeedback.classList.add("d-none");
+            }
+        }
+
         function validateMontantForSubmit() {
             var frais = getFrais();
             var mode = normalizeMode(paiementSelect.value);
+            clearMontantError();
+
+            if (!voitureSelect.value) {
+                showMontantError("Selectionnez d'abord une voiture.");
+                return false;
+            }
+
             applyPaiementMode(mode === "avec");
+            syncHidden();
+
             if (mode === "sans" || mode === "tout") {
                 return true;
             }
-            /* "Avec avance" : avance doit être > 0 */
-            var avance = Number(montantInput.value);
-            if (!Number.isFinite(avance) || avance <= 0) {
-                montantInput.classList.add("is-invalid");
-                if (montantFeedback) montantFeedback.classList.remove("d-none");
+            if (frais <= 1) {
+                showMontantError("Pour cette voiture, choisissez 'Tout paye' (frais insuffisant pour une avance partielle).");
                 return false;
             }
+            var avance = Number(montantHidden.value);
+            if (!Number.isFinite(avance) || avance <= 0 || avance >= frais) {
+                showMontantError("Saisissez une avance entre 1 et " + (frais - 1) + " Ar.");
+                return false;
+            }
+            syncHidden();
             return true;
         }
 
@@ -739,6 +783,7 @@
                 lastEditableValue = montantInput.value;
             }
             applyPaiementMode(false);
+            clearMontantError();
         });
 
         voitureSelect.addEventListener("change", function () {
@@ -754,8 +799,6 @@
 
         if (form) {
             form.addEventListener("submit", function (e) {
-                /* Toujours synchroniser le hidden avant envoi */
-                syncHidden();
                 if (!validateMontantForSubmit()) {
                     e.preventDefault();
                     e.stopPropagation();
@@ -764,6 +807,9 @@
         }
 
         applyPaiementMode(true);
+        if (montantFeedback && montantFeedback.textContent && !montantFeedback.classList.contains("d-none")) {
+            montantInput.classList.add("is-invalid");
+        }
     });
 </script>
 

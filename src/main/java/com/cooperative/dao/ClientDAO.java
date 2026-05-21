@@ -12,7 +12,7 @@ public class ClientDAO {
     public void create(Client client) throws SQLException {
         String sql = "INSERT INTO client (idcli, nom, numtel) VALUES (?, ?, ?)";
         try (Connection cn = DBConnection.getConnection(); PreparedStatement ps = cn.prepareStatement(sql)) {
-            ps.setInt(1, client.getIdCli());
+            ps.setString(1, client.getIdCli());
             ps.setString(2, client.getNom());
             ps.setString(3, client.getNumTel());
             ps.executeUpdate();
@@ -24,15 +24,15 @@ public class ClientDAO {
         try (Connection cn = DBConnection.getConnection(); PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setString(1, client.getNom());
             ps.setString(2, client.getNumTel());
-            ps.setInt(3, client.getIdCli());
+            ps.setString(3, client.getIdCli());
             ps.executeUpdate();
         }
     }
 
-    public void delete(int idCli) throws SQLException {
+    public void delete(String idCli) throws SQLException {
         String sql = "DELETE FROM client WHERE idcli=?";
         try (Connection cn = DBConnection.getConnection(); PreparedStatement ps = cn.prepareStatement(sql)) {
-            ps.setInt(1, idCli);
+            ps.setString(1, idCli);
             ps.executeUpdate();
         }
     }
@@ -48,14 +48,14 @@ public class ClientDAO {
         return clients;
     }
 
-    public boolean exists(int idCli) throws SQLException {
-        return findById(idCli) != null;
+    public boolean exists(String idCli) throws SQLException {
+        return idCli != null && !idCli.isBlank() && findById(idCli) != null;
     }
 
-    public Client findById(int idCli) throws SQLException {
+    public Client findById(String idCli) throws SQLException {
         String sql = "SELECT idcli, nom, numtel FROM client WHERE idcli=?";
         try (Connection cn = DBConnection.getConnection(); PreparedStatement ps = cn.prepareStatement(sql)) {
-            ps.setInt(1, idCli);
+            ps.setString(1, idCli);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return map(rs);
@@ -83,7 +83,7 @@ public class ClientDAO {
 
     private Client map(ResultSet rs) throws SQLException {
         Client c = new Client();
-        c.setIdCli(rs.getInt("idcli"));
+        c.setIdCli(rs.getString("idcli"));
         c.setNom(rs.getString("nom"));
         c.setNumTel(rs.getString("numtel"));
         return c;

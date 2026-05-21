@@ -1,5 +1,13 @@
 package com.cooperative.dao;
 
+import com.cooperative.model.PaiementReport;
+import com.cooperative.model.Reservation;
+import com.cooperative.model.ReservationReceiptData;
+import com.cooperative.model.ReservationView;
+import com.cooperative.model.Voiture;
+import com.cooperative.util.DBConnection;
+import com.cooperative.util.DateFormatUtil;
+
 import java.sql.Connection;
 import java.sql.Date;
 import java.sql.PreparedStatement;
@@ -10,14 +18,6 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
-import com.cooperative.model.PaiementReport;
-import com.cooperative.model.Reservation;
-import com.cooperative.model.ReservationReceiptData;
-import com.cooperative.model.ReservationView;
-import com.cooperative.model.Voiture;
-import com.cooperative.util.DBConnection;
-import com.cooperative.util.DateFormatUtil;
 
 public class ReservationDAO {
 
@@ -30,7 +30,7 @@ public class ReservationDAO {
         try (Connection cn = DBConnection.getConnection(); PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setString(1, reservation.getIdReserv());
             ps.setString(2, reservation.getIdVoit());
-            ps.setInt(3, reservation.getIdCli());
+            ps.setString(3, reservation.getIdCli());
             ps.setInt(4, reservation.getPlace());
             ps.setTimestamp(5, Timestamp.valueOf(reservation.getDateReserv()));
             ps.setDate(6, Date.valueOf(reservation.getDateVoyage()));
@@ -49,7 +49,7 @@ public class ReservationDAO {
         String sql = "UPDATE reserver SET idvoit=?, idcli=?, place=?, date_reserv=?, date_voyage=?, paiement=?, montant_avance=? WHERE idreserv=?";
         try (Connection cn = DBConnection.getConnection(); PreparedStatement ps = cn.prepareStatement(sql)) {
             ps.setString(1, reservation.getIdVoit());
-            ps.setInt(2, reservation.getIdCli());
+            ps.setString(2, reservation.getIdCli());
             ps.setInt(3, reservation.getPlace());
             ps.setTimestamp(4, Timestamp.valueOf(reservation.getDateReserv()));
             ps.setDate(5, Date.valueOf(reservation.getDateVoyage()));
@@ -217,11 +217,11 @@ public class ReservationDAO {
     private String categoryWhereClause(String payCat) {
         switch (payCat.toLowerCase()) {
             case "avance":
-                return "r.paiement='Avec avance' AND r.montant_avance > 0";
+                return "r.paiement='Avec avance'";
             case "tout":
-                return "r.paiement='Tout payé'";
+                return "r.paiement LIKE 'Tout pay%'";
             case "non":
-                return "(r.paiement='Sans avance' OR (r.montant_avance = 0 AND r.paiement <> 'Tout payé'))";
+                return "r.paiement='Sans avance'";
             default:
                 return "1=0";
         }
@@ -231,10 +231,10 @@ public class ReservationDAO {
         List<PaiementReport> reports = new ArrayList<>();
         String sql = "SELECT categorie, COUNT(*) total FROM ("
                 + "SELECT CASE "
-                + "WHEN paiement='Tout payé' THEN 'Tout payé' "
-                + "WHEN paiement='Avec avance' AND montant_avance > 0 THEN 'Avance avec reste a payer' "
-                + "WHEN paiement='Sans avance' OR montant_avance = 0 THEN 'Pas encore paye' "
-                + "ELSE 'Autre' END AS categorie "
+                + "WHEN paiement LIKE 'Tout pay%' THEN 'tout' "
+                + "WHEN paiement = 'Avec avance' THEN 'avance' "
+                + "WHEN paiement = 'Sans avance' THEN 'non' "
+                + "ELSE 'autre' END AS categorie "
                 + "FROM reserver) t GROUP BY categorie";
         try (Connection cn = DBConnection.getConnection(); PreparedStatement ps = cn.prepareStatement(sql); ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
@@ -301,7 +301,7 @@ public class ReservationDAO {
         Reservation r = new Reservation();
         r.setIdReserv(rs.getString("idreserv"));
         r.setIdVoit(rs.getString("idvoit"));
-        r.setIdCli(rs.getInt("idcli"));
+        r.setIdCli(rs.getString("idcli"));
         r.setPlace(rs.getInt("place"));
         r.setDateReserv(rs.getTimestamp("date_reserv").toLocalDateTime());
         r.setDateVoyage(rs.getDate("date_voyage").toLocalDate());
@@ -315,7 +315,7 @@ public class ReservationDAO {
         v.setIdReserv(rs.getString("idreserv"));
         v.setIdVoit(rs.getString("idvoit"));
         v.setTypeVoiture(rs.getString("type_voiture"));
-        v.setIdCli(rs.getInt("idcli"));
+        v.setIdCli(rs.getString("idcli"));
         v.setNomClient(rs.getString("nom"));
         v.setNumTel(rs.getString("numtel"));
         v.setPlace(rs.getInt("place"));
@@ -337,13 +337,17 @@ public class ReservationDAO {
                 .replace("è", "e")
                 .replace("ê", "e")
                 .replace("à", "a");
-        if ("tout paye".equals(compact) || compact.contains("payã©")) return "Tout payé";
-        if ("avec avance".equals(compact)) return "Avec avance";
-        if ("sans avance".equals(compact)) return "Sans avance";
+        if ("sans avance".equals(compact) || compact.startsWith("sans")) return "Sans avance";
+        if ("avec avance".equals(compact) || compact.startsWith("avec")) return "Avec avance";
+        if ("tout paye".equals(compact) || compact.contains("tout pay")
+                || compact.contains("payã©") || (compact.contains("tout") && compact.contains("pay"))) {
+            return "Tout payé";
+        }
         return value;
     }
 
     private void validatePaymentRules(Reservation reservation) throws SQLException {
+        reservation.setPaiement(normalizePaiement(reservation.getPaiement()));
         int frais = findFraisByVoiture(reservation.getIdVoit());
         int avance = reservation.getMontantAvance();
         String paiement = reservation.getPaiement();
@@ -352,10 +356,15 @@ public class ReservationDAO {
             throw new SQLException("Avec 'Sans avance', le montant avance doit etre 0.");
         }
         if ("Tout payé".equals(paiement) && avance != frais) {
-            throw new SQLException("Avec 'Tout payé', le montant avance doit etre egal au frais (" + frais + " Ar).");
+            throw new SQLException("Avec 'Tout payé', le montant avance doit egaler le frais.");
         }
-        if ("Avec avance".equals(paiement) && avance <= 0) {
-            throw new SQLException("Avec 'Avec avance', le montant avance doit etre superieur a 0.");
+        if ("Avec avance".equals(paiement)) {
+            if (frais <= 1) {
+                throw new SQLException("Le frais de cette voiture ne permet pas une avance partielle. Choisissez 'Tout paye'.");
+            }
+            if (avance <= 0 || avance >= frais) {
+                throw new SQLException("Avec 'Avec avance', le montant avance doit etre entre 1 et " + (frais - 1) + ".");
+            }
         }
     }
 

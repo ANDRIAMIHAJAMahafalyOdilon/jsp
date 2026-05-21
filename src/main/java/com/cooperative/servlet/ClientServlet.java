@@ -14,9 +14,11 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @WebServlet("/clients")
 public class ClientServlet extends HttpServlet {
+    private static final Pattern ID_CLIENT_PATTERN = Pattern.compile("[A-Za-z0-9\\-_]{1,30}");
     private final ClientDAO clientDAO = new ClientDAO();
 
     @Override
@@ -26,20 +28,20 @@ public class ClientServlet extends HttpServlet {
 
         try {
             if ("checkId".equals(action)) {
-                int id = parsePositiveIntQuiet(req.getParameter("id"));
-                boolean exists = id > 0 && clientDAO.exists(id);
+                String id = safe(req.getParameter("id"));
+                boolean exists = !id.isBlank() && clientDAO.exists(id);
                 resp.setContentType("application/json;charset=UTF-8");
                 resp.getWriter().write("{\"exists\":" + exists + "}");
                 return;
             }
             if ("delete".equals(action)) {
-                clientDAO.delete(Integer.parseInt(req.getParameter("id")));
+                clientDAO.delete(requireNonBlank(req.getParameter("id"), "ID client manquant."));
                 setFlash(req, "success", "Client supprime avec succes.");
                 resp.sendRedirect(req.getContextPath() + "/clients");
                 return;
             }
             if ("edit".equals(action)) {
-                req.setAttribute("clientEdit", clientDAO.findById(Integer.parseInt(req.getParameter("id"))));
+                req.setAttribute("clientEdit", clientDAO.findById(requireNonBlank(req.getParameter("id"), "ID client manquant.")));
             }
             forwardList(req, resp, search);
         } catch (SQLException e) {
@@ -64,13 +66,18 @@ public class ClientServlet extends HttpServlet {
             if (!c.getNumTel().matches("[0-9]{6,20}")) {
                 throw new FieldValidationException("Telephone invalide (chiffres uniquement).", null);
             }
+            String idCli = requireNonBlank(req.getParameter("idcli"), "ID client obligatoire.");
+            if (!ID_CLIENT_PATTERN.matcher(idCli).matches()) {
+                throw new FieldValidationException(
+                        "ID client invalide (lettres, chiffres, tiret ou underscore, 1 a 30 caracteres).", "idcli");
+            }
             if ("update".equals(action)) {
-                c.setIdCli(parsePositiveInt(req.getParameter("idcli"), "ID client invalide."));
+                c.setIdCli(idCli);
                 clientDAO.update(c);
                 setFlash(req, "success", "Client modifie avec succes.");
                 resp.sendRedirect(req.getContextPath() + "/clients");
             } else {
-                c.setIdCli(parsePositiveInt(req.getParameter("idcli"), "ID client obligatoire (nombre entier positif)."));
+                c.setIdCli(idCli);
                 if (clientDAO.exists(c.getIdCli())) {
                     throw new FieldValidationException("Cet ID client existe deja.", "idcli");
                 }
@@ -81,7 +88,7 @@ public class ClientServlet extends HttpServlet {
         } catch (FieldValidationException e) {
             if ("update".equals(action)) {
                 setFlash(req, "danger", e.getMessage());
-                resp.sendRedirect(req.getContextPath() + "/clients?action=edit&id=" + c.getIdCli());
+                resp.sendRedirect(req.getContextPath() + "/clients?action=edit&id=" + encode(c.getIdCli()));
             } else {
                 req.setAttribute("clientForm", c);
                 req.setAttribute("idCliError", e.getMessage());
@@ -148,12 +155,16 @@ public class ClientServlet extends HttpServlet {
         }
     }
 
-    private int parsePositiveIntQuiet(String raw) {
-        try {
-            return parsePositiveInt(raw, "");
-        } catch (IllegalArgumentException e) {
-            return -1;
+    private String requireNonBlank(String value, String message) {
+        if (value == null || value.trim().isBlank()) {
+            throw new IllegalArgumentException(message);
         }
+        return value.trim();
+    }
+
+    private String encode(String value) {
+        if (value == null) return "";
+        return java.net.URLEncoder.encode(value, java.nio.charset.StandardCharsets.UTF_8);
     }
 
     private List<Client> paginate(List<Client> data, int page, int size) {
@@ -178,22 +189,6 @@ public class ClientServlet extends HttpServlet {
             return Math.max(1, Integer.parseInt(req.getParameter("page")));
         } catch (Exception e) {
             return 1;
-        }
-    }
-
-    private int parsePositiveInt(String raw, String message) {
-        String v = raw == null ? "" : raw.trim();
-        if (v.isBlank()) {
-            throw new IllegalArgumentException(message);
-        }
-        try {
-            int value = Integer.parseInt(v);
-            if (value <= 0) {
-                throw new IllegalArgumentException(message);
-            }
-            return value;
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(message);
         }
     }
 

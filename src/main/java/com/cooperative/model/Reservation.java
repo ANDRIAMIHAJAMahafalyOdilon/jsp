@@ -6,7 +6,7 @@ import java.time.LocalDateTime;
 public class Reservation {
     private String idReserv;
     private String idVoit;
-    private int idCli;
+    private String idCli;
     private int place;
     private LocalDateTime dateReserv;
     private LocalDate dateVoyage;
@@ -17,8 +17,8 @@ public class Reservation {
     public void setIdReserv(String idReserv) { this.idReserv = idReserv; }
     public String getIdVoit() { return idVoit; }
     public void setIdVoit(String idVoit) { this.idVoit = idVoit; }
-    public int getIdCli() { return idCli; }
-    public void setIdCli(int idCli) { this.idCli = idCli; }
+    public String getIdCli() { return idCli; }
+    public void setIdCli(String idCli) { this.idCli = idCli; }
     public int getPlace() { return place; }
     public void setPlace(int place) { this.place = place; }
     public LocalDateTime getDateReserv() { return dateReserv; }

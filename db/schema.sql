@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS voiture (
 );
 
 CREATE TABLE IF NOT EXISTS client (
-    idcli INT PRIMARY KEY AUTO_INCREMENT,
+    idcli VARCHAR(30) PRIMARY KEY,
     nom VARCHAR(120) NOT NULL,
     numtel VARCHAR(30) NOT NULL
 );
@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS place (
 CREATE TABLE IF NOT EXISTS reserver (
     idreserv VARCHAR(30) PRIMARY KEY,
     idvoit VARCHAR(20) NOT NULL,
-    idcli INT NOT NULL,
+    idcli VARCHAR(30) NOT NULL,
     place INT NOT NULL,
     date_reserv DATETIME NOT NULL,
     date_voyage DATE NOT NULL,

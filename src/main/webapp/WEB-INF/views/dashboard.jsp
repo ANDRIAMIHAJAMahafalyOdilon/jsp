@@ -1,4 +1,4 @@
-﻿<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
+<%@ page contentType="text/html; charset=UTF-8" pageEncoding="UTF-8" %>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/fmt" prefix="fmt" %>
 <%@ include file="common/header.jspf" %>
@@ -6,7 +6,15 @@
 <style>
     .card-stats { border: none; border-radius: 12px; transition: transform .2s; }
     .card-stats:hover { transform: translateY(-5px); }
-    .status-badge { font-size: .78rem; padding: 5px 12px; border-radius: 20px; font-weight: 600; }
+    .status-badge {
+        font-size: .78rem;
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-weight: 600;
+        white-space: nowrap;
+        display: inline-block;
+    }
+    .paiement-cell { white-space: nowrap; }
     #newResModal .modal-content { max-height: 90vh; }
     #newResModal form { display: flex; flex-direction: column; height: 100%; }
     #newResModal .modal-body { overflow-y: auto; }
@@ -46,26 +54,11 @@
     </div>
     <div class="col-md-4">
         <div class="card card-stats bg-white shadow-sm p-4 text-center">
-            <p class="text-muted mb-1">Reste a recouvrer</p>
+            <p class="text-muted mb-1">Reste à recouvrer</p>
             <h3 class="fw-bold text-danger mb-0"><fmt:formatNumber value="${resteAPayer}" type="number" groupingUsed="true" /> Ar</h3>
         </div>
     </div>
 </div>
-
-<c:set var="countAvance" value="0" />
-<c:set var="countNon" value="0" />
-<c:set var="countTout" value="0" />
-<c:forEach var="ps" items="${paiementStats}">
-    <c:if test="${ps.categorie == 'Avance avec reste a payer'}">
-        <c:set var="countAvance" value="${ps.total}" />
-    </c:if>
-    <c:if test="${ps.categorie == 'Pas encore paye'}">
-        <c:set var="countNon" value="${ps.total}" />
-    </c:if>
-    <c:if test="${ps.categorie == 'Tout payÃ©'}">
-        <c:set var="countTout" value="${ps.total}" />
-    </c:if>
-</c:forEach>
 
 <div class="card border-0 shadow-sm rounded-4 mb-4">
     <div class="card-body p-4">
@@ -82,7 +75,7 @@
                     <div class="card border-0 shadow-sm p-3 h-100">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="text-muted small">Avance + reste Ã  payer</div>
+                                <div class="text-muted small">Avance + reste à payer</div>
                                 <div class="fs-4 fw-bold text-warning">${countAvance}</div>
                             </div>
                             <span class="badge bg-warning-subtle text-warning">Avec avance</span>
@@ -95,7 +88,7 @@
                     <div class="card border-0 shadow-sm p-3 h-100">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="text-muted small">Pas encore payÃ©</div>
+                                <div class="text-muted small">Pas encore payé</div>
                                 <div class="fs-4 fw-bold text-danger">${countNon}</div>
                             </div>
                             <span class="badge bg-danger-subtle text-danger">Sans avance</span>
@@ -108,10 +101,10 @@
                     <div class="card border-0 shadow-sm p-3 h-100">
                         <div class="d-flex justify-content-between align-items-center">
                             <div>
-                                <div class="text-muted small">Tout payÃ©</div>
+                                <div class="text-muted small">Tout payé</div>
                                 <div class="fs-4 fw-bold text-success">${countTout}</div>
                             </div>
-                            <span class="badge bg-success-subtle text-success">Tout payÃ©</span>
+                            <span class="badge bg-success-subtle text-success">Tout payé</span>
                         </div>
                     </div>
                 </a>
@@ -120,7 +113,7 @@
 
         <c:if test="${not empty payCat}">
             <div class="d-flex justify-content-between align-items-center mb-2 mt-2">
-                <h6 class="fw-semibold mb-0">Liste des voyageurs â€” ${payCatLabel}</h6>
+                <h6 class="fw-semibold mb-0">Liste des voyageurs — ${payCatLabel}</h6>
                 <span class="badge text-bg-primary">Total : ${travellersCount}</span>
             </div>
             <div class="table-responsive">
@@ -147,12 +140,24 @@
                             <td>${t.idVoit}</td>
                             <td><span class="badge bg-secondary">${t.typeVoiture}</span></td>
                             <td>${t.place}</td>
-                            <td>${t.paiement}</td>
+                            <td class="paiement-cell">
+                                <c:choose>
+                                    <c:when test="${t.paiement == 'Tout payé' or fn:startsWith(t.paiement, 'Tout pay')}">
+                                        <span class="status-badge bg-success-subtle text-success">Tout payé</span>
+                                    </c:when>
+                                    <c:when test="${t.paiement == 'Avec avance'}">
+                                        <span class="status-badge bg-warning-subtle text-warning">Avec avance</span>
+                                    </c:when>
+                                    <c:otherwise>
+                                        <span class="status-badge bg-danger-subtle text-danger">Sans avance</span>
+                                    </c:otherwise>
+                                </c:choose>
+                            </td>
                             <td><fmt:formatNumber value="${t.montantAvance}" type="number" groupingUsed="true" /> Ar</td>
                             <td><fmt:formatNumber value="${t.reste}" type="number" groupingUsed="true" /> Ar</td>
                             <td>${t.dateVoyageLabel}</td>
                             <td class="text-center">
-                                <a class="btn btn-light btn-sm" target="_blank" href="${pageContext.request.contextPath}/receipt?id=${t.idReserv}" title="PDF reÃ§u">
+                                <a class="btn btn-light btn-sm" target="_blank" href="${pageContext.request.contextPath}/receipt?id=${t.idReserv}" title="PDF reçu">
                                     <i class="bi bi-filetype-pdf text-danger"></i>
                                 </a>
                             </td>
